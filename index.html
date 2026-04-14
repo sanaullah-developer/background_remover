@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CutOut — Person Background Remover</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --accent: #c8ff57;
+    --accent2: #57ffcc;
+    --text: #f0f0f0;
+    --muted: #666;
+    --danger: #ff4d4d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.6;
+  }
+
+  /* Glow blobs */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.07;
+    pointer-events: none;
+    animation: float 8s ease-in-out infinite;
+  }
+  .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -200px; right: -100px; animation-delay: 0s; }
+  .blob-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -100px; left: -100px; animation-delay: 4s; }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-30px) scale(1.05); }
+  }
+
+  /* Header */
+  header {
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 1.3rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo span {
+    color: var(--accent);
+  }
+
+  .badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.8rem;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* Main */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 4rem 2rem 6rem;
+    position: relative;
+    z-index: 10;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+
+  .hero h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.2rem;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+    position: relative;
+  }
+
+  .hero h1 em::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: 0.4;
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 1.1rem;
+    font-weight: 300;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 20px;
+    padding: 3.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(200, 255, 87, 0.04) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-zone:hover::before,
+  .upload-zone.drag-over::before { opacity: 1; }
+
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    border-style: solid;
+  }
+
+  .upload-zone.drag-over {
+    background: rgba(200, 255, 87, 0.03);
+  }
+
+  .upload-icon {
+    width: 64px;
+    height: 64px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 1.8rem;
+    transition: transform 0.2s;
+  }
+
+  .upload-zone:hover .upload-icon { transform: translateY(-3px); }
+
+  .upload-zone h3 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  .upload-zone p {
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Processing state */
+  .processing-bar {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    margin-top: 2rem;
+    overflow: hidden;
+    display: none;
+  }
+
+  .processing-bar.active { display: block; }
+
+  .processing-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent));
+    background-size: 200% 100%;
+    width: 100%;
+    animation: shimmer 1.2s linear infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+
+  /* Results Grid */
+  .results {
+    display: none;
+    margin-top: 3rem;
+    gap: 1.5rem;
+  }
+
+  .results.visible { display: grid; grid-template-columns: 1fr 1fr; }
+
+  @media (max-width: 700px) {
+    .results.visible { grid-template-columns: 1fr; }
+  }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .result-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .result-card-header .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  .dot-original { background: var(--muted); }
+  .dot-result { background: var(--accent); }
+
+  .result-card-header span {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .result-img-wrap {
+    padding: 1rem;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .result-img-wrap.checkered {
+    background-image:
+      linear-gradient(45deg, #1e1e1e 25%, transparent 25%),
+      linear-gradient(-45deg, #1e1e1e 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1e1e1e 75%),
+      linear-gradient(-45deg, transparent 75%, #1e1e1e 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: #161616;
+  }
+
+  .result-img-wrap img {
+    max-width: 100%;
+    max-height: 380px;
+    object-fit: contain;
+    border-radius: 6px;
+    display: block;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Download button */
+  .download-row {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-download {
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    background: var(--accent);
+    color: #000;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn-download:hover {
+    background: #d9ff6e;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(200, 255, 87, 0.2);
+  }
+
+  /* Reset button */
+  .btn-reset {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 2rem auto 0;
+    padding: 0.65rem 1.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-reset:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  /* Error toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--danger);
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 1000;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Stats strip */
+  .stats-strip {
+    display: none;
+    margin-top: 1.5rem;
+    padding: 1rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    gap: 2rem;
+  }
+
+  .stats-strip.visible { display: flex; flex-wrap: wrap; }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* Spinner overlay on upload zone */
+  .spinner-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1rem;
+    border-radius: 20px;
+  }
+
+  .spinner-overlay.active { display: flex; }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .spinner-text {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* Config note */
+  .config-note {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .config-note code {
+    background: var(--surface2);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    color: var(--accent2);
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<header>
+  <div class="logo">CUT<span>OUT</span></div>
+  <div class="badge">AI Background Removal</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Remove<br>backgrounds<br><em>instantly</em></h1>
+    <p><p>Upload any image and remove the background instantly with high precision.</p></p>
+  </div>
+
+  <!-- Upload Zone -->
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="fileInput" accept="image/*">
+    <div class="upload-icon">📷</div>
+    <h3>Upload your image</h3>
+<p>Drag & drop or click to browse · JPG, PNG, WEBP · up to 10MB</p>
+    <div class="spinner-overlay" id="spinnerOverlay">
+      <div class="spinner"></div>
+      <div class="spinner-text">Segmenting...</div>
+    </div>
+  </div>
+
+
+  <!-- Stats -->
+  <div class="stats-strip" id="statsStrip">
+    <div class="stat">
+      <div class="stat-label">Time</div>
+      <div class="stat-value" id="statTime">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Input size</div>
+      <div class="stat-value" id="statSize">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Resolution</div>
+      <div class="stat-value" id="statRes">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Status</div>
+      <div class="stat-value" style="color:var(--accent2)" id="statStatus">—</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="result-card">
+      <div class="result-card-header">
+        <div class="dot dot-original"></div>
+        <span>Original</span>
+      </div>
+      <div class="result-img-wrap">
+        <img id="originalImg" src="" alt="Original">
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-card-header">
+        <div class="dot dot-result"></div>
+        <span>Result</span>
+      </div>
+      <div class="result-img-wrap checkered">
+        <img id="resultImg" src="" alt="Result">
+      </div>
+      <div class="download-row">
+        <a class="btn-download" id="downloadBtn" href="#" download="cutout.png">
+          Download Image
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-reset" id="resetBtn" onclick="reset()" style="display:none">
+    Upload Another Image
+  </button>
+</main>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────
+  const API_BASE = window.location.origin;
+
+  // ── DOM refs ──────────────────────────────────────────────
+  const dropZone       = document.getElementById('dropZone');
+  const fileInput      = document.getElementById('fileInput');
+  const spinner        = document.getElementById('spinnerOverlay');
+  const results        = document.getElementById('results');
+  const statsStrip     = document.getElementById('statsStrip');
+  const originalImg    = document.getElementById('originalImg');
+  const resultImg      = document.getElementById('resultImg');
+  const downloadBtn    = document.getElementById('downloadBtn');
+  const resetBtn       = document.getElementById('resetBtn');
+  const toast          = document.getElementById('toast');
+
+  // ── Drag & Drop ──────────────────────────────────────────
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) processFile(e.target.files[0]);
+  });
+
+  // ── Main processing ──────────────────────────────────────
+  async function processFile(file) {
+    if (!file.type.startsWith('image/')) { showToast('Please upload an image file'); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast('Image too large (max 10MB)'); return; }
+
+    // Show original preview
+    const reader = new FileReader();
+    reader.onload = e => { originalImg.src = e.target.result; };
+    reader.readAsDataURL(file);
+
+    // Show spinner
+    spinner.classList.add('active');
+    fileInput.disabled = true;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const t0 = performance.now();
+
+    try {
+      const response = await fetch(`${API_BASE}/remove-background`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Server error');
+      }
+
+      const data = await response.json();
+
+      // Show results
+      resultImg.src = data.image_base64;
+      downloadBtn.href = data.image_base64;
+      results.classList.add('visible');
+      resetBtn.style.display = 'flex';
+
+      // Stats
+      document.getElementById('statTime').textContent = `${elapsed}s`;
+      document.getElementById('statSize').textContent = formatBytes(file.size);
+      document.getElementById('statRes').textContent = `${data.width}×${data.height}`;
+      document.getElementById('statStatus').textContent = '✓ Person found';
+      statsStrip.classList.add('visible');
+
+    } catch (err) {
+      showToast(err.message);
+    } finally {
+      spinner.classList.remove('active');
+      fileInput.disabled = false;
+    }
+  }
+
+  function reset() {
+    results.classList.remove('visible');
+    statsStrip.classList.remove('visible');
+    resetBtn.style.display = 'none';
+    originalImg.src = '';
+    resultImg.src = '';
+    fileInput.value = '';
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3500);
+  }
+
+  function formatBytes(b) {
+    if (b < 1024) return b + 'B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + 'KB';
+    return (b / 1048576).toFixed(1) + 'MB';
+  }
+</script>
+</body>
+</html>
