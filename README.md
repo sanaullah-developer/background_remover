@@ -1,15 +1,3 @@
----
-
-title: CutOut — AI Background Remover
-emoji: ✂️
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-pinned: true
-short_description: Remove image backgrounds instantly using AI
-license: apache-2.0
--------------------
----
 # ✂️ CutOut — AI Background Remover
 
 A fast, modern web application that removes image backgrounds using a custom-trained YOLO segmentation model. Upload an image with a person and instantly get a clean cutout with a transparent background.
