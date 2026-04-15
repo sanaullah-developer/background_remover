@@ -39,14 +39,14 @@ The model detects the person and produces a **segmentation mask** — a pixel-le
 ### Step 3 — Binary Mask
 The segmentation output is converted into a clean **binary mask** (white = person, black = background). This mask is resized back to the original image dimensions and slightly smoothed with a Gaussian blur to soften edges.
 
-![Binary Mask](images\mask.png)
+![Binary Mask](images/mask.png)
 
 ---
 
 ### Step 4 — Alpha Channel Compositing
 The binary mask is applied as the **alpha (transparency) channel** of the original image. Pixels where the mask is black become fully transparent — effectively erasing the background.
 
-![Final Output](images\output.png)
+![Final Output](images/output.png)
 
 ---
 
