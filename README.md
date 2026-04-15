@@ -39,7 +39,7 @@ The model detects the person and produces a **segmentation mask** — a pixel-le
 ### Step 3 — Binary Mask
 The segmentation output is converted into a clean **binary mask** (white = person, black = background). This mask is resized back to the original image dimensions and slightly smoothed with a Gaussian blur to soften edges.
 
-![Binary Mask](images/mask.jpg)
+![Binary Mask](images\mask.png)
 
 ---
 
