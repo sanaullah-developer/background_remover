@@ -54,7 +54,7 @@ The binary mask is applied as the **alpha (transparency) channel** of the origin
 
 The model was trained for **27 epochs** on a Tesla T4 GPU using the [Supervise.ly filtered person segmentation dataset](https://www.kaggle.com/datasets/tapakah68/supervisely-filtered-segmentation-person-dataset) (~2,700 images).
 
-![Training Metrics](images/metrics.png)
+![Training Metrics](images/performance.png)
 
 | Metric | Value |
 |---|---|
